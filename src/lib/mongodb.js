@@ -33,11 +33,7 @@ async function connectDB() {
     cached.promise = null;
     throw e;
   }
-<<<<<<< HEAD
-
-=======
   // console.log("🔗 MongoDB connected:");
->>>>>>> d1c856b (final commit)
   return cached.conn;
 }
 

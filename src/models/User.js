@@ -41,15 +41,11 @@ userSchema.pre('save', async function(next) {
 });
 
 // Compare password method
-<<<<<<< HEAD
-userSchema.methods.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
-};
-=======
+
 // userSchema.methods.comparePassword = async function(candidatePassword) {
 //   if (!this.password) throw new Error('Password not found');
 //   return await bcrypt.compare(candidatePassword, this.password);
 // };
->>>>>>> d1c856b (final commit)
+
 
 export default mongoose.models.User || mongoose.model('User', userSchema);

@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import jwt from 'jsonwebtoken';
-<<<<<<< HEAD
-=======
+
 import bcrypt from 'bcryptjs';
->>>>>>> d1c856b (final commit)
+
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
@@ -23,14 +22,6 @@ export async function POST(req) {
       );
     }
 
-<<<<<<< HEAD
-=======
-    // console.log("jwt secret:", JWT_SECRET);
-    // console.log("jwt expires in:", JWT_EXPIRES_IN);
-
-    // console.log('🔍 Attempting login for:', email);
-
->>>>>>> d1c856b (final commit)
     // Find user
     const user = await User.findOne({ email });
     if (!user) {
@@ -40,20 +31,13 @@ export async function POST(req) {
       );
     }
 
-<<<<<<< HEAD
-    // Check password
-    const isPasswordValid = await user.comparePassword(password);
-=======
-//     console.log('Entered password:', password);
-// console.log('Stored hash:', user.password);
-//  console.log("user authenticated:", user);
     // Check password
     // const isPasswordValid = await user.comparePassword(password);
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
 // console.log('Password comparison result:', isPasswordValid);
    
->>>>>>> d1c856b (final commit)
+
     if (!isPasswordValid) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
@@ -77,11 +61,6 @@ export async function POST(req) {
       );
     }
 
-<<<<<<< HEAD
-=======
-   
-
->>>>>>> d1c856b (final commit)
     // Generate JWT token
     const token = jwt.sign(
       { 
@@ -94,12 +73,6 @@ export async function POST(req) {
       { expiresIn: JWT_EXPIRES_IN }
     );
 
-<<<<<<< HEAD
-=======
-    // console.log("token generated:", token); 
-
-
->>>>>>> d1c856b (final commit)
     return NextResponse.json({
       token,
       user: {
