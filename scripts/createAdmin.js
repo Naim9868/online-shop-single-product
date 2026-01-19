@@ -25,9 +25,11 @@ async function createAdmin() {
     const users = db.collection('users');
 
     // Check existing
-    const existing = await users.findOne({ email: ADMIN_EMAIL });
-    if (existing) {
-      console.log('⚠️ Admin already exists:', ADMIN_EMAIL);
+    const AdminNumber = await users.countDocuments();
+    console.log(AdminNumber);
+
+    if (AdminNumber === 4) {
+      console.log('⚠️ Admin already fullfilled', await users.findOne({ role: 'admin' }));
       return;
     }
 
