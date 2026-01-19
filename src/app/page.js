@@ -124,24 +124,24 @@ export default function Home() {
   }
 
   // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-200 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
-            <p className="text-sm">{error}</p>
-          </div>
-          <button 
-            onClick={() => window.location.reload()}
-            className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // if (error) {
+  //   return (
+  //     <div className="min-h-screen bg-gray-200 flex items-center justify-center">
+  //       <div className="text-center max-w-md mx-auto p-6">
+  //         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+  //           <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
+  //           <p className="text-sm">{error}</p>
+  //         </div>
+  //         <button 
+  //           onClick={() => window.location.reload()}
+  //           className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+  //         >
+  //           Try Again
+  //         </button>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   // No product selected state
   if (!selectedProduct) {
