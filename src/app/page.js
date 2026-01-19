@@ -1,10 +1,12 @@
+// app/page.js
+
 import HomeClient from './HomeClient';
 
 async function getHomeData() {
   // SSR-safe base URL
   const baseUrl =
     process.env.NEXT_PUBLIC_BASE_URL ||
-    `https://${process.env.VERCEL_URL || 'localhost:3000'}`;
+    `https://${process.env.VERCEL_URL }`;
 
   const [productsRes, selectedRes, heroRes, deliveryRes] = await Promise.all([
     fetch(`${baseUrl}/api/products`, { cache: 'no-store' }),
