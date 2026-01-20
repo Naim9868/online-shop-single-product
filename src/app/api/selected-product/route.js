@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
-import SelectedProduct from '@/models/SelectedProduct';
+import {SelectedProduct} from '@/models';
 
 // GET - Get the currently selected product
 export async function GET() {

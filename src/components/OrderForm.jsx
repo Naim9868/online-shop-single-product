@@ -482,7 +482,7 @@ export default function OrderForm({
                   type="number"
                   id="productCount"
                   name="productCount"
-                  min="1"
+                  min="0"
                   max="9"
                   value={orderData.productCount}
                   onChange={handleInputChange}
