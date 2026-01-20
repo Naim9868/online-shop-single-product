@@ -14,15 +14,27 @@ const selectedProductSchema = new mongoose.Schema({
 
 // Only one selected product at a time
 selectedProductSchema.statics.setSelectedProduct = async function(productId) {
-  // Remove any existing selected product
   await this.deleteMany({});
-  // Create new selected product
   return await this.create({ productId });
 };
 
+// 🔥 FIXED: Remove populate, fetch product separately
 selectedProductSchema.statics.getSelectedProduct = async function() {
-  const selected = await this.findOne().populate('productId');
-  return selected ? selected.productId : null;
+  try {
+    const selected = await this.findOne();
+    
+    if (!selected) {
+      return null;
+    }
+    
+    // Just return the ID - client will fetch details separately
+    return { _id: selected.productId };
+    
+  } catch (error) {
+    console.error('Error in getSelectedProduct:', error);
+    return null;
+  }
 };
 
-export default mongoose.models.SelectedProduct || mongoose.model('SelectedProduct', selectedProductSchema);
+export default mongoose.models.SelectedProduct || 
+       mongoose.model('SelectedProduct', selectedProductSchema);

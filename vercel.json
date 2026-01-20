@@ -1,0 +1,18 @@
+{
+  "functions": {
+    "app/api/selected-product/route.js": {
+      "maxDuration": 30,
+      "memory": 1024,
+      "minInstances": 1
+    },
+    "app/api/hero/route.js": {
+      "maxDuration": 30,
+      "memory": 1024,
+      "minInstances": 1
+    }
+  },
+  "regions": ["sin1"],
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "framework": "nextjs"
+}
