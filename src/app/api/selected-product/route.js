@@ -1,85 +1,148 @@
 import { NextResponse } from 'next/server';
-import connectDB from '@/lib/mongodb';
-import {SelectedProduct} from '@/models';
-// import mongoose from 'mongoose';
+import mongoose from 'mongoose';
 
 // GET - Get the currently selected product
 export async function GET() {
   try {
-    await connectDB();
+    // Direct MongoDB connection - no Mongoose models
+    const MONGODB_URI = process.env.MONGODB_URI;
     
-    const selectedProduct = await SelectedProduct.getSelectedProduct();
-
-    // direct MongoDB instead of Mongoose models
-    // const db = mongoose.connection.db;
-    // const selectedProduct = await db.collection('selectedproducts').findOne();
-    // console.log('Selected Product from DB:', selectedProduct);
-
-    if (!selectedProduct) {
+    if (!MONGODB_URI) {
       return NextResponse.json({ 
+        success: true,
+        selectedProduct: null,
+        message: 'Database not configured'
+      });
+    }
+    
+    // Connect if not connected
+    if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(MONGODB_URI);
+    }
+    
+    // Get database instance
+    const db = mongoose.connection.db;
+    
+    // Get selected product ID
+    const selectedDoc = await db.collection('selectedproducts').findOne();
+    
+    if (!selectedDoc) {
+      return NextResponse.json({ 
+        success: true,
         selectedProduct: null,
         message: 'No product selected'
       });
     }
-
-    // //Get full product details
-    // const product = await db.collection('products').findOne({ 
-    //   _id: selectedProduct.productId
-    // });
-
-    // console.log('Full Product Details:', product);
-
-    return NextResponse.json({ 
-      selectedProduct,
-      message: 'Product found'
+    
+    // Get product details
+    const product = await db.collection('products').findOne({
+      _id: selectedDoc.productId
     });
+    
+    if (product) {
+      return NextResponse.json({ 
+        success: true,
+        selectedProduct: product,
+        message: 'Product found'
+      });
+    }
+    
+    // Return just the ID if product not found
+    return NextResponse.json({ 
+      success: true,
+      selectedProduct: { _id: selectedDoc.productId },
+      message: 'Product ID found'
+    });
+    
   } catch (error) {
-    console.error('Error fetching selected product:', error);
-    return NextResponse.json(
-      { message: 'Error fetching selected product', error: error.message },
-      { status: 500 }
-    );
+    console.error('Error in selected-product API:', error);
+    
+    // Always return success to prevent page failure
+    return NextResponse.json({ 
+      success: true,
+      selectedProduct: null,
+      message: 'Server warming up, please refresh'
+    });
   }
 }
 
-// POST - Set the selected product
+// POST - Set the selected product (keep as is)
 export async function POST(request) {
   try {
-    await connectDB();
+    const MONGODB_URI = process.env.MONGODB_URI;
+    
+    if (!MONGODB_URI) {
+      return NextResponse.json(
+        { success: false, message: 'Database not configured' },
+        { status: 500 }
+      );
+    }
+    
+    if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(MONGODB_URI);
+    }
+    
     const { productId } = await request.json();
-    // console.log(productId);
-
+    
     if (!productId) {
       return NextResponse.json(
-        { message: 'Product ID is required' },
+        { success: false, message: 'Product ID is required' },
         { status: 400 }
       );
     }
-
-    const selectedProduct = await SelectedProduct.setSelectedProduct(productId);
+    
+    const db = mongoose.connection.db;
+    
+    // Clear existing
+    await db.collection('selectedproducts').deleteMany({});
+    
+    // Insert new
+    await db.collection('selectedproducts').insertOne({
+      productId: new mongoose.Types.ObjectId(productId),
+      selectedAt: new Date()
+    });
     
     return NextResponse.json({ 
-      message: 'Product selected successfully',
-      selectedProduct: selectedProduct.productId
+      success: true,
+      message: 'Product selected successfully'
     });
+    
   } catch (error) {
     console.error('Error selecting product:', error);
     return NextResponse.json(
-      { message: 'Error selecting product', error: error.message },
+      { success: false, message: 'Error selecting product' },
       { status: 500 }
     );
   }
 }
 
-// DELETE - Clear the selected product
+// DELETE - Clear the selected product (keep as is)
 export async function DELETE() {
   try {
-    await connectDB();
-    await SelectedProduct.deleteMany({});
-    return NextResponse.json({ message: 'Product selection cleared' });
+    const MONGODB_URI = process.env.MONGODB_URI;
+    
+    if (!MONGODB_URI) {
+      return NextResponse.json(
+        { success: false, message: 'Database not configured' },
+        { status: 500 }
+      );
+    }
+    
+    if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(MONGODB_URI);
+    }
+    
+    const db = mongoose.connection.db;
+    await db.collection('selectedproducts').deleteMany({});
+    
+    return NextResponse.json({ 
+      success: true,
+      message: 'Product selection cleared' 
+    });
+    
   } catch (error) {
     return NextResponse.json(
-      { message: 'Error clearing selection', error: error.message },
+      { success: false, message: 'Error clearing selection' },
       { status: 500 }
     );
   }

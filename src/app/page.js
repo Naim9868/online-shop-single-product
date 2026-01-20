@@ -57,111 +57,77 @@ export default function Home() {
 
   // 🔥 UPDATED: Load data incrementally like admin page
   useEffect(() => {
-    let mounted = true;
+  
 
     const fetchDataIncrementally = async () => {
       try {
-        setError(null);
+        setLoading(true);
         
-        // 🔥 STEP 1: Load hero data FIRST (fastest, shows immediately)
-        try {
-          const heroResponse = await fetch('/api/hero');
-          if (heroResponse.ok && mounted) {
-            const heroData = await heroResponse.json();
-            setHeroData(heroData);
-          }
-          if (mounted) setLoadingStates(prev => ({ ...prev, hero: false }));
-        } catch (heroErr) {
-          console.log('Hero data optional:', heroErr);
-        }
-
-        // 🔥 STEP 2: Load selected product ID
-        let selectedProductId = null;
-        try {
-          const selectedResponse = await fetch('/api/selected-product');
-          if (selectedResponse.ok) {
-            const selectedData = await selectedResponse.json();
-            if (selectedData.selectedProduct?._id) {
-              selectedProductId = selectedData.selectedProduct._id;
-            }
-          }
-          if (mounted) setLoadingStates(prev => ({ ...prev, selected: false }));
-        } catch (selectedErr) {
-          console.log('Selected product error:', selectedErr);
-        }
-
-        // 🔥 STEP 3: If we have product ID, load product details
-        if (selectedProductId && mounted) {
+        // Try to fetch selected product
+        let selectedProduct = null;
+        let retries = 0;
+        
+        while (retries < 3 && !selectedProduct) {
           try {
-            const productResponse = await fetch(`/api/products/${selectedProductId}`);
-            if (productResponse.ok) {
-              const productData = await productResponse.json();
-              if (mounted) {
-                setSelectedProduct(productData.product);
+            const response = await fetch('/api/selected-product');
+            const data = await response.json();
+            
+            if (data.success && data.selectedProduct) {
+              selectedProduct = data.selectedProduct;
+              
+              // If we only have ID, fetch full product
+              if (selectedProduct._id && !selectedProduct.name) {
+                const productResponse = await fetch(`/api/products/${selectedProduct._id}`);
+                const productData = await productResponse.json();
+                if (productData.product) {
+                  selectedProduct = productData.product;
+                }
               }
+              
+              setSelectedProduct(selectedProduct);
+              break;
             }
-            if (mounted) setLoadingStates(prev => ({ ...prev, product: false }));
-          } catch (productErr) {
-            console.log('Product details error:', productErr);
+          } catch (err) {
+            console.log(`Attempt ${retries + 1} failed`);
           }
-        }
-
-        // 🔥 STEP 4: Load delivery in background
-        setTimeout(async () => {
-          if (mounted) {
-            try {
-              const deliveryResponse = await fetch('/api/delivery');
-              if (deliveryResponse.ok) {
-                const deliveryData = await deliveryResponse.json();
-                setDeliveryCharge(deliveryData);
-              }
-            } catch (deliveryErr) {
-              console.log('Delivery optional:', deliveryErr);
-            } finally {
-              if (mounted) setLoadingStates(prev => ({ ...prev, delivery: false }));
-            }
-          }
-        }, 1000);
-
-        // 🔥 STEP 5: Load products list in background (least important)
-        setTimeout(async () => {
-          if (mounted) {
-            try {
-              const productsResponse = await fetch('/api/products');
-              if (productsResponse.ok) {
-                const productsData = await productsResponse.json();
-                setProducts(productsData.products || []);
-              }
-            } catch (productsErr) {
-              console.log('Products list optional:', productsErr);
-            }
-          }
-        }, 1500);
-
-      } catch (err) {
-        if (mounted) {
-          console.error('Error:', err);
-          setError(`Loading issue: ${err.message || 'Please try again'}`);
-        }
-      } finally {
-        // 🔥 Only show loading for critical data
-        if (mounted) {
-          // Check if we have minimum data to show page
-          const hasMinimumData = heroData !== null && selectedProduct !== null;
-          const stillLoadingCritical = loadingStates.hero || loadingStates.selected || loadingStates.product;
           
-          if (!stillLoadingCritical && hasMinimumData) {
-            setLoading(false);
+          retries++;
+          if (retries < 3) {
+            await new Promise(resolve => setTimeout(resolve, 500));
           }
         }
+        
+        // Load other data in parallel
+        const [heroResponse, deliveryResponse] = await Promise.allSettled([
+          fetch('/api/hero'),
+          fetch('/api/delivery')
+        ]);
+        
+        if (heroResponse.status === 'fulfilled') {
+          const heroData = await heroResponse.value.json();
+          setHeroData(heroData);
+        }
+        
+        if (deliveryResponse.status === 'fulfilled') {
+          const deliveryData = await deliveryResponse.value.json();
+          setDeliveryCharge(deliveryData);
+        }
+        
+        // If still no product, show fallback UI
+        if (!selectedProduct) {
+          setError('Product not available. Please try refreshing.');
+        }
+        
+      } catch (err) {
+        console.error('Error:', err);
+        setError('Loading... Please wait a moment and refresh.');
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchDataIncrementally();
 
-    return () => {
-      mounted = false;
-    };
   }, []);
 
   // 🔥 NEW: Check if we can show page with partial data
