@@ -3,7 +3,8 @@
     "app/api/selected-product/route.js": {
       "maxDuration": 30,
       "memory": 1024,
-      "minInstances": 1
+      "minInstances": 1,
+      "maxInstances": 100
     },
     "app/api/hero/route.js": {
       "maxDuration": 30,
@@ -14,5 +15,15 @@
   "regions": ["sin1"],
   "buildCommand": "npm run build",
   "installCommand": "npm install",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
+      ]
+    }
+  ]
 }
