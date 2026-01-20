@@ -1,36 +1,10 @@
-// app/page.js
+// app/page.js - UPDATED VERSION
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import ProductShowcase from '@/components/ProductShowcase';
 import OrderForm from '@/components/OrderForm';
-
-// In-memory cache for API responses
-const apiCache = new Map();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-const fetchWithCache = async (key, fetchFn) => {
-  const cached = apiCache.get(key);
-  const now = Date.now();
-
-  if (cached && now - cached.timestamp < CACHE_DURATION) {
-    return cached.data;
-  }
-
-  try {
-    const data = await fetchFn();
-    apiCache.set(key, { data, timestamp: now });
-    return data;
-  } catch (error) {
-    // Return stale cache if available
-    if (cached) {
-      console.warn(`Using stale cache for ${key}`);
-      return cached.data;
-    }
-    throw error;
-  }
-};
 
 export default function Home() {
   const [products, setProducts] = useState([]);
@@ -42,6 +16,14 @@ export default function Home() {
   const [billingInfo, setBillingInfo] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // ADD: Track individual loading states
+  const [loadingStates, setLoadingStates] = useState({
+    hero: true,
+    selected: true,
+    product: true,
+    delivery: true
+  });
 
   // Memoized scroll function
   const scrollToOrderForm = useCallback(() => {
@@ -73,131 +55,124 @@ export default function Home() {
     visible: { opacity: 1, y: 0, transition: { duration: 0.6, delay } },
   });
 
-  // Optimized data fetching - loads hero first, then product
+  // 🔥 UPDATED: Load data incrementally like admin page
   useEffect(() => {
     let mounted = true;
-    let timeoutId;
 
-    const fetchInitialData = async () => {
+    const fetchDataIncrementally = async () => {
       try {
-        setLoading(true);
         setError(null);
-
-        // Fetch hero data first (smallest, fastest to load)
-        const heroPromise = fetchWithCache('hero', async () => {
-          const res = await fetch('/api/hero');
-          if (!res.ok) throw new Error('Hero API failed');
-          return res.json();
-        });
-
-        // Fetch selected product ID (small data)
-        const selectedPromise = fetchWithCache('selected-product', async () => {
-          const res = await fetch('/api/selected-product');
-          if (!res.ok) {
-            // If 500 error, try to get at least the product ID
-            const fallbackRes = await fetch('/api/selected-product', {
-              headers: { 'Cache-Control': 'no-cache' }
-            });
-            if (!fallbackRes.ok) throw new Error('Selected product API failed');
-            return fallbackRes.json();
+        
+        // 🔥 STEP 1: Load hero data FIRST (fastest, shows immediately)
+        try {
+          const heroResponse = await fetch('/api/hero');
+          if (heroResponse.ok && mounted) {
+            const heroData = await heroResponse.json();
+            setHeroData(heroData);
           }
-          return res.json();
-        });
-
-        // Wait for initial critical data
-        const [heroResponse, selectedResponse] = await Promise.allSettled([
-          heroPromise,
-          selectedPromise
-        ]);
-
-        if (!mounted) return;
-
-        // Set hero data immediately (shows first)
-        if (heroResponse.status === 'fulfilled') {
-          setHeroData(heroResponse.value);
+          if (mounted) setLoadingStates(prev => ({ ...prev, hero: false }));
+        } catch (heroErr) {
+          console.log('Hero data optional:', heroErr);
         }
 
-        // Handle selected product
-        if (selectedResponse.status === 'fulfilled' && 
-            selectedResponse.value.selectedProduct?._id) {
-          
-          const productId = selectedResponse.value.selectedProduct._id;
-          
-          // Fetch product details with cache
-          const productDetails = await fetchWithCache(
-            `product-${productId}`,
-            async () => {
-              const res = await fetch(`/api/products/${productId}`);
-              if (!res.ok) {
-                // Try one more time without cache
-                const fallbackRes = await fetch(`/api/products/${productId}`, {
-                  headers: { 'Cache-Control': 'no-cache' }
-                });
-                if (!fallbackRes.ok) throw new Error('Product details API failed');
-                return fallbackRes.json();
-              }
-              return res.json();
+        // 🔥 STEP 2: Load selected product ID
+        let selectedProductId = null;
+        try {
+          const selectedResponse = await fetch('/api/selected-product');
+          if (selectedResponse.ok) {
+            const selectedData = await selectedResponse.json();
+            if (selectedData.selectedProduct?._id) {
+              selectedProductId = selectedData.selectedProduct._id;
             }
-          );
-          
-          if (mounted) {
-            setSelectedProduct(productDetails.product);
-            setLoading(false); // Show page with product
           }
+          if (mounted) setLoadingStates(prev => ({ ...prev, selected: false }));
+        } catch (selectedErr) {
+          console.log('Selected product error:', selectedErr);
+        }
 
-          // Load remaining data in background
-          if (mounted) {
-            Promise.allSettled([
-              fetchWithCache('products', async () => {
-                const res = await fetch('/api/products');
-                if (!res.ok) throw new Error('Products API failed');
-                return res.json();
-              }),
-              fetchWithCache('delivery', async () => {
-                const res = await fetch('/api/delivery');
-                if (!res.ok) throw new Error('Delivery API failed');
-                return res.json();
-              })
-            ]).then(([productsRes, deliveryRes]) => {
+        // 🔥 STEP 3: If we have product ID, load product details
+        if (selectedProductId && mounted) {
+          try {
+            const productResponse = await fetch(`/api/products/${selectedProductId}`);
+            if (productResponse.ok) {
+              const productData = await productResponse.json();
               if (mounted) {
-                if (productsRes.status === 'fulfilled') {
-                  setProducts(productsRes.value.products || []);
-                }
-                if (deliveryRes.status === 'fulfilled') {
-                  setDeliveryCharge(deliveryRes.value);
-                }
+                setSelectedProduct(productData.product);
               }
-            });
-          }
-          
-        } else {
-          // No selected product found
-          if (mounted) {
-            setLoading(false);
+            }
+            if (mounted) setLoadingStates(prev => ({ ...prev, product: false }));
+          } catch (productErr) {
+            console.log('Product details error:', productErr);
           }
         }
+
+        // 🔥 STEP 4: Load delivery in background
+        setTimeout(async () => {
+          if (mounted) {
+            try {
+              const deliveryResponse = await fetch('/api/delivery');
+              if (deliveryResponse.ok) {
+                const deliveryData = await deliveryResponse.json();
+                setDeliveryCharge(deliveryData);
+              }
+            } catch (deliveryErr) {
+              console.log('Delivery optional:', deliveryErr);
+            } finally {
+              if (mounted) setLoadingStates(prev => ({ ...prev, delivery: false }));
+            }
+          }
+        }, 1000);
+
+        // 🔥 STEP 5: Load products list in background (least important)
+        setTimeout(async () => {
+          if (mounted) {
+            try {
+              const productsResponse = await fetch('/api/products');
+              if (productsResponse.ok) {
+                const productsData = await productsResponse.json();
+                setProducts(productsData.products || []);
+              }
+            } catch (productsErr) {
+              console.log('Products list optional:', productsErr);
+            }
+          }
+        }, 1500);
 
       } catch (err) {
         if (mounted) {
-          console.error('Error fetching data:', err);
-          setError(`Failed to load data: ${err.message || err}`);
-          setLoading(false);
+          console.error('Error:', err);
+          setError(`Loading issue: ${err.message || 'Please try again'}`);
+        }
+      } finally {
+        // 🔥 Only show loading for critical data
+        if (mounted) {
+          // Check if we have minimum data to show page
+          const hasMinimumData = heroData !== null && selectedProduct !== null;
+          const stillLoadingCritical = loadingStates.hero || loadingStates.selected || loadingStates.product;
+          
+          if (!stillLoadingCritical && hasMinimumData) {
+            setLoading(false);
+          }
         }
       }
     };
 
-    // Add small delay to prevent loading flash
-    timeoutId = setTimeout(() => {
-      fetchInitialData();
-    }, 100);
+    fetchDataIncrementally();
 
     return () => {
       mounted = false;
-      clearTimeout(timeoutId);
     };
   }, []);
 
-  // Get final hero data (product heroData overrides global heroData)
+  // 🔥 NEW: Check if we can show page with partial data
+  useEffect(() => {
+    // If we have hero data and selected product, we can show page
+    if (heroData !== null && selectedProduct !== null) {
+      setLoading(false);
+    }
+  }, [heroData, selectedProduct]);
+
+  // Get final hero data
   const getFinalHeroData = useCallback(() => {
     if (selectedProduct?.heroData) {
       return {
@@ -210,117 +185,161 @@ export default function Home() {
 
   const finalHeroData = getFinalHeroData();
 
-  // Loading state - shows minimal skeleton
+  // 🔥 UPDATED: Better loading state - show partial content
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-200">
-        {/* Hero loading skeleton */}
-        <div className="h-40 bg-gradient-to-r from-red-500 to-red-600 animate-pulse rounded-b-3xl"></div>
-        
-        {/* Minimal product skeleton */}
-        <div className="max-w-6xl mx-auto p-4">
-          <div className="bg-white rounded-xl p-6 mt-6 animate-pulse">
+      <div className="min-h-screen bg-gray-200 text-gray-800 font-sans">
+        {/* Show hero section immediately if we have data */}
+        {heroData && (
+          <motion.section
+            initial="hidden"
+            animate="visible"
+            variants={fadeIn()}
+            className="text-center bg-red-600 text-white py-8 rounded-b-3xl shadow-lg"
+          >
+            <h1 className="text-xl md:text-2xl font-bold mb-3 animate-pulse">
+              {heroData.mainTitle || 'Loading...'}
+            </h1>
+            <div className="flex items-center justify-center gap-2 text-sm md:text-base">
+              <span className="line-through opacity-80">
+                ৳{heroData.originalPrice || '...'}
+              </span>
+              <span className="bg-white text-red-600 px-4 py-1 rounded-full font-semibold">
+                {heroData.buttonText || 'Loading'} ৳{heroData.currentPrice || '...'}
+              </span>
+            </div>
+            <div className="mt-5 bg-white/20 text-white font-semibold px-8 py-2 rounded-xl opacity-50">
+              Loading product...
+            </div>
+          </motion.section>
+        )}
+
+        {/* Show product skeleton */}
+        <div className="p-4">
+          <div className="bg-white rounded-xl p-6 max-w-4xl mx-auto mt-4 animate-pulse">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="h-64 bg-gray-300 rounded-lg"></div>
-              <div>
-                <div className="h-6 bg-gray-300 rounded w-3/4 mb-4"></div>
-                <div className="h-4 bg-gray-300 rounded w-full mb-2"></div>
-                <div className="h-4 bg-gray-300 rounded w-2/3 mb-2"></div>
-                <div className="h-10 bg-red-400 rounded w-1/2 mt-8"></div>
+              <div className="space-y-4">
+                <div className="h-6 bg-gray-300 rounded w-3/4"></div>
+                <div className="h-4 bg-gray-300 rounded w-full"></div>
+                <div className="h-4 bg-gray-300 rounded w-2/3"></div>
+                <div className="h-10 bg-gray-300 rounded w-1/2 mt-8"></div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    );
-  }
 
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-200 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
-            <p className="text-sm">{error}</p>
+        {/* Show loading indicator */}
+        <div className="text-center mt-8">
+          <div className="inline-flex items-center gap-2 text-gray-600">
+            <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+            Loading product details...
           </div>
-          <button 
-            onClick={() => window.location.reload()}
-            className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
-          >
-            Try Again
-          </button>
         </div>
       </div>
     );
   }
 
-  // No product selected state
-  if (!selectedProduct) {
+  // Error state - show partial content if possible
+  if (error && !selectedProduct) {
     return (
-      <div className="min-h-screen bg-gray-200 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
-            <h2 className="text-xl font-semibold mb-2">No Product Selected</h2>
-            <p className="text-sm">Please select a product from the admin panel first.</p>
+      <div className="min-h-screen bg-gray-200 flex items-center justify-center p-4">
+        <div className="text-center max-w-md mx-auto">
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="text-red-500 text-5xl mb-4">⚠️</div>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Product Loading Issue</h2>
+            <p className="text-gray-600 mb-4 text-sm">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+            >
+              Try Again
+            </button>
           </div>
-          <button 
-            onClick={() => window.location.reload()}
-            className="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
-          >
-            Check Again
-          </button>
         </div>
       </div>
     );
   }
 
+  // No product selected but we have hero data - show something
+  if (!selectedProduct && heroData) {
+    return (
+      <div className="min-h-screen bg-gray-200 text-gray-800 font-sans">
+        <motion.section
+          initial="hidden"
+          animate="visible"
+          variants={fadeIn()}
+          className="text-center bg-red-600 text-white py-8 rounded-b-3xl shadow-lg"
+        >
+          <h1 className="text-xl md:text-2xl font-bold mb-3">
+            {heroData.mainTitle || 'Store Coming Soon'}
+          </h1>
+          <p className="mt-5">Please check back soon for our products!</p>
+        </motion.section>
+        
+        <div className="text-center mt-8">
+          <div className="bg-white rounded-xl p-8 max-w-md mx-auto">
+            <p className="text-gray-600">No product is currently selected.</p>
+            <p className="text-sm text-gray-500 mt-2">Admin needs to select a product first.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 🔥 MAIN PAGE RENDER - Shows even if some data missing
   return (
     <div className="min-h-screen bg-gray-200 text-gray-800 font-sans">
-      {/* Hero Section */}
-      <motion.section
-        initial="hidden"
-        animate="visible"
-        variants={fadeIn()}
-        className="text-center bg-red-600 text-white py-8 rounded-b-3xl shadow-lg"
-      >
-        <h1 className="text-xl md:text-2xl font-bold mb-3">
-          {finalHeroData?.mainTitle || 'Premium T-Shirt Collection'}
-        </h1>
-        <div className="flex items-center justify-center gap-2 text-sm md:text-base">
-          <span className="line-through opacity-80">
-            ৳{finalHeroData?.originalPrice || '2000'}
-          </span>
-          <span className="bg-white text-red-600 px-4 py-1 rounded-full font-semibold">
-            {finalHeroData?.buttonText || 'Special Offer'} ৳{finalHeroData?.currentPrice || '990'}
-          </span>
-        </div>
-        <button
-          onClick={scrollToOrderForm}
-          className="mt-5 bg-white text-red-600 font-semibold px-8 py-2 rounded-xl shadow-lg hover:bg-gray-100 transition-all duration-200 transform hover:scale-105"
+      {/* Hero Section - Always shows if we have heroData */}
+      {heroData && (
+        <motion.section
+          initial="hidden"
+          animate="visible"
+          variants={fadeIn()}
+          className="text-center bg-red-600 text-white py-8 rounded-b-3xl shadow-lg"
         >
-          অর্ডার করতে চাই
-        </button>
-      </motion.section>
+          <h1 className="text-xl md:text-2xl font-bold mb-3">
+            {finalHeroData?.mainTitle || 'Premium T-Shirt Collection'}
+          </h1>
+          <div className="flex items-center justify-center gap-2 text-sm md:text-base">
+            <span className="line-through opacity-80">
+              ৳{finalHeroData?.originalPrice || '2000'}
+            </span>
+            <span className="bg-white text-red-600 px-4 py-1 rounded-full font-semibold">
+              {finalHeroData?.buttonText || 'Special Offer'} ৳{finalHeroData?.currentPrice || '990'}
+            </span>
+          </div>
+          <button
+            onClick={scrollToOrderForm}
+            className="mt-5 bg-white text-red-600 font-semibold px-8 py-2 rounded-xl shadow-lg hover:bg-gray-100 transition-all duration-200 transform hover:scale-105"
+          >
+            অর্ডার করতে চাই
+          </button>
+        </motion.section>
+      )}
 
-      {/* Product Showcase Component */}
-      <ProductShowcase
-        onOrderClick={scrollToOrderForm}
-        product={selectedProduct}
-      />
-
-      {/* Order Form Section */}
-      <div id="order-form-section">
-        <OrderForm
+      {/* Product Showcase - Only shows if we have product */}
+      {selectedProduct && (
+        <ProductShowcase
+          onOrderClick={scrollToOrderForm}
           product={selectedProduct}
-          onOrderDataChange={handleOrderData}
-          selectedSize={selectedSize}
-          shippingMethod={shippingMethod}
-          deliveryCharge={deliveryCharge}
         />
-      </div>
+      )}
 
-      {/* Footer */}
+      {/* Order Form Section - Only shows if we have product */}
+      {selectedProduct && (
+        <div id="order-form-section">
+          <OrderForm
+            product={selectedProduct}
+            onOrderDataChange={handleOrderData}
+            selectedSize={selectedSize}
+            shippingMethod={shippingMethod}
+            deliveryCharge={deliveryCharge}
+          />
+        </div>
+      )}
+
+      {/* Footer - Always shows */}
       <footer className="py-5 sm:py-8 text-center text-sm text-gray-600 bg-white mt-2">
         <div className="container mx-auto px-4">
           <p>© 2025 Positive | All rights reserved.</p>

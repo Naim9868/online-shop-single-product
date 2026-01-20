@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import {SelectedProduct} from '@/models';
+// import mongoose from 'mongoose';
 
 // GET - Get the currently selected product
 export async function GET() {
@@ -8,13 +9,25 @@ export async function GET() {
     await connectDB();
     
     const selectedProduct = await SelectedProduct.getSelectedProduct();
-    
+
+    // direct MongoDB instead of Mongoose models
+    // const db = mongoose.connection.db;
+    // const selectedProduct = await db.collection('selectedproducts').findOne();
+    // console.log('Selected Product from DB:', selectedProduct);
+
     if (!selectedProduct) {
       return NextResponse.json({ 
         selectedProduct: null,
         message: 'No product selected'
       });
     }
+
+    // //Get full product details
+    // const product = await db.collection('products').findOne({ 
+    //   _id: selectedProduct.productId
+    // });
+
+    // console.log('Full Product Details:', product);
 
     return NextResponse.json({ 
       selectedProduct,
