@@ -11,7 +11,7 @@ const orderSchema = new mongoose.Schema({
   
   // Order details
   size: { type: String, required: true },
-  productCount: { type: Number, default: 1 },
+  productCount: { type: Number, default: 1},
   shipping: { 
     type: String,
     required: true 

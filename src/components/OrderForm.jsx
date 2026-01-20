@@ -148,9 +148,26 @@ export default function OrderForm({
   // Handle input changes with validation
   const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
+  
+      let newValue = value;
+      
+      if (name === 'productCount') {
+        if (value === '' || value === '0') {
+          // Allow empty or 0 temporarily for user to type
+          newValue = '';
+        } else {
+          const num = parseInt(value);
+          if (!isNaN(num) && num > 0) {
+            newValue = num; // Convert to number
+          } else {
+            newValue = 1; // Default fallback
+          }
+        }
+      }
+
     const updatedData = {
       ...orderData,
-      [name]: name === 'productCount' ? Math.max(1, parseInt(value) || 1) : value,
+      [name]: newValue,
     };
     
     setOrderData(updatedData);
@@ -479,11 +496,9 @@ export default function OrderForm({
                   Product Count (পণ্যের পরিমাণ) *
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   id="productCount"
                   name="productCount"
-                  min="1"
-                  max="9"
                   value={orderData.productCount}
                   onChange={handleInputChange}
                   className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all duration-200"
