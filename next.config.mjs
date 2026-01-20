@@ -10,7 +10,7 @@ const nextConfig = {
     ],
   },
   reactStrictMode: true,
-  swcMinify: true,
+  // swcMinify: true,
   experimental: {
     // Optimize for Vercel
     optimizeCss: true,

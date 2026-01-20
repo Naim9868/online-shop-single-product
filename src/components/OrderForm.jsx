@@ -21,7 +21,7 @@ export default function OrderForm({
     email: "",
     district: "",
     address: "",
-    productCount: 1,
+    productCount: "",
     size: selectedSize,
     shipping: "", // Empty by default - user must select
   });
@@ -482,7 +482,7 @@ export default function OrderForm({
                   type="number"
                   id="productCount"
                   name="productCount"
-                  min="0"
+                  min="1"
                   max="9"
                   value={orderData.productCount}
                   onChange={handleInputChange}
