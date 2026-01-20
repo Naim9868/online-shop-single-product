@@ -203,15 +203,17 @@ useEffect(() => {
   const getFinalHeroData = useCallback(() => {
     if (selectedProduct?.heroData) {
       return {
-        ...heroData,
-        ...selectedProduct.heroData
+        ...selectedProduct.heroData,
+        ...heroData
       };
     }
     return heroData;
   }, [selectedProduct, heroData]);
+  console.log("Hero Data:", heroData);
 
   const finalHeroData = getFinalHeroData();
 
+  console.log("Final Hero Data:", finalHeroData);
   // 🔥 UPDATED: Better loading state - show partial content
   if (loading) {
     return (
